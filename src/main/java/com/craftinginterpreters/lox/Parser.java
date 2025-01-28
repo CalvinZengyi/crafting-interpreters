@@ -27,6 +27,8 @@ class Parser {
 
     private Stmt declaration() {
         try {
+            if (match(TokenType.CLASS))
+                return classDeclaration();
             if (match(TokenType.VAR))
                 return varDeclaration();
             if (match(TokenType.FUN))
@@ -36,6 +38,19 @@ class Parser {
             synchronize();
             return null;
         }
+    }
+
+    private Stmt classDeclaration() {
+        Token name = consume(TokenType.IDENTIFIER, "Expect class name");
+        consume(TokenType.LEFT_BRACE, "Expect '{' before class body.");
+
+        List<Stmt.Function> methods = new ArrayList<>();
+        while (!check(TokenType.RIGHT_BRACE) && !isAtEnd()) {
+            methods.add(function("method"));
+        }
+
+        consume(TokenType.RIGHT_BRACE, "Expect '}' after class body.");
+        return new Stmt.Class(name, methods);
     }
 
     private Stmt varDeclaration() {
@@ -56,6 +71,7 @@ class Parser {
         Stmt body = statement();
         return new Stmt.While(condition, body);
     }
+
     private Expr expression() {
         return assignment();
     }
@@ -89,7 +105,7 @@ class Parser {
     private Expr and() {
         Expr expr = equality();
         while (match(TokenType.AND)) {
-            Token operator  = previous();
+            Token operator = previous();
             Expr right = equality();
             expr = new Expr.Logical(expr, operator, right);
         }
@@ -97,13 +113,16 @@ class Parser {
     }
 
     private Stmt statement() {
-        if (match(TokenType.FOR)) return forStatement();
-        if (match(TokenType.IF)) return ifStatement();
+        if (match(TokenType.FOR))
+            return forStatement();
+        if (match(TokenType.IF))
+            return ifStatement();
         if (match(TokenType.PRINT))
             return printStatement();
         if (match(TokenType.RETURN))
             return returnStatement();
-        if (match(TokenType.WHILE)) return whileStatement();
+        if (match(TokenType.WHILE))
+            return whileStatement();
         if (match(TokenType.LEFT_BRACE))
             return new Stmt.Block(block());
 
@@ -113,7 +132,7 @@ class Parser {
     private Stmt forStatement() {
         consume(TokenType.LEFT_PAREN, "Expect '(' after 'for'.");
         Stmt initializer;
-        if(match(TokenType.SEMICOLON)) {
+        if (match(TokenType.SEMICOLON)) {
             initializer = null;
         } else if (match(TokenType.VAR)) {
             initializer = varDeclaration();
@@ -128,7 +147,7 @@ class Parser {
 
         Expr increment = null;
         if (!check(TokenType.RIGHT_PAREN)) {
-            increment = expression(); 
+            increment = expression();
         }
         consume(TokenType.RIGHT_PAREN, "Expect ')' after for clauses.");
         Stmt body = statement();
@@ -136,7 +155,8 @@ class Parser {
             body = new Stmt.Block(Arrays.asList(body, new Stmt.Expression(increment)));
         }
 
-        if (condition == null) condition = new Expr.Literal(true);
+        if (condition == null)
+            condition = new Expr.Literal(true);
         body = new Stmt.While(condition, body);
 
         if (initializer != null) {
@@ -153,7 +173,7 @@ class Parser {
         Stmt thenBranch = statement();
         Stmt elseBranch = null;
         if (match(TokenType.ELSE)) {
-            elseBranch = statement(); 
+            elseBranch = statement();
         }
         return new Stmt.If(condition, thenBranch, elseBranch);
     }
@@ -264,6 +284,9 @@ class Parser {
         while (true) {
             if (match(TokenType.LEFT_PAREN)) {
                 expr = finishCall(expr);
+            } else if (match(TokenType.DOT)) {
+                Token name = consume(TokenType.IDENTIFIER, "Expect property name after '.'.");
+                expr = new Expr.Get(expr, name);
             } else {
                 break;
             }
